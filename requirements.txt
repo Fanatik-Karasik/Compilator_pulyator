@@ -1,0 +1,2 @@
+ No external dependencies required for Sprint 1
+ Python 3.13 standard library is sufficient

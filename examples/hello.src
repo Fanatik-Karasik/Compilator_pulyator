@@ -1,0 +1,7 @@
+fn main() {
+    int x = 42;
+    // Это комментарий
+    if (x > 10) {
+        return true;
+    }
+}
