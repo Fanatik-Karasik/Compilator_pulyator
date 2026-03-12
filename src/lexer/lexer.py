@@ -153,8 +153,7 @@ class Lexer:
         if char == '!':
             if self.match('='):
                 return Token(TokenType.NOT_EQUAL, "!=", self.line, start_col)
-            self.error("Unexpected character '!'")
-            return Token(TokenType.ERROR, "!", self.line, start_col)
+            return Token(TokenType.BANG, "!", self.line, start_col)
         if char == '<':
             if self.match('='):
                 return Token(TokenType.LESS_EQUAL, "<=", self.line, start_col)
