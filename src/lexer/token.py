@@ -26,6 +26,7 @@ class TokenType(Enum):
     STAR = auto()
     SLASH = auto()
     PERCENT = auto()
+    BANG = auto()
     ASSIGN = auto()
     EQUAL = auto()
     NOT_EQUAL = auto()
