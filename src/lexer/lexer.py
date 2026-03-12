@@ -25,7 +25,6 @@ class Lexer:
         self.current = 0
         self.line = 1
         self.column = 1
-        self.tokens: List[Token] = []
         self.errors: List[str] = []
 
     def peek(self) -> str:
@@ -82,12 +81,10 @@ class Lexer:
                 self.line += 1
                 self.column = 1
             self.advance()
-
         if self.is_at_end():
             self.error("Unterminated string.", start_col)
             return Token(TokenType.ERROR, "Unterminated string", self.line, start_col)
-
-        self.advance()  # closing "
+        self.advance()
         value = self.source[self.start + 1:self.current - 1]
         lexeme = self.source[self.start:self.current]
         return Token(TokenType.STRING_LITERAL, lexeme, self.line, start_col, value)
@@ -96,7 +93,6 @@ class Lexer:
         start_col = self.column
         while self.peek().isdigit():
             self.advance()
-
         if self.peek() == '.' and self.peek_next().isdigit():
             self.advance()
             while self.peek().isdigit():
@@ -104,7 +100,6 @@ class Lexer:
             value = float(self.source[self.start:self.current])
             lexeme = self.source[self.start:self.current]
             return Token(TokenType.FLOAT_LITERAL, lexeme, self.line, start_col, value)
-
         value = int(self.source[self.start:self.current])
         lexeme = self.source[self.start:self.current]
         return Token(TokenType.INT_LITERAL, lexeme, self.line, start_col, value)
@@ -113,7 +108,6 @@ class Lexer:
         start_col = self.column
         while self.peek().isalnum() or self.peek() == '_':
             self.advance()
-        
         text = self.source[self.start:self.current]
         token_type = self.KEYWORDS.get(text, TokenType.IDENTIFIER)
         return Token(token_type, text, self.line, start_col)
@@ -128,26 +122,19 @@ class Lexer:
         self.skip_whitespace()
         self.start = self.current
         start_col = self.column
-
         if self.is_at_end():
             return Token(TokenType.END_OF_FILE, "", self.line, self.column)
-
         char = self.advance()
-
         if char.isalpha() or char == '_':
             self.current -= 1
             self.column -= 1
             return self.identifier()
-
         if char.isdigit():
             self.current -= 1
             self.column -= 1
             return self.number()
-
         if char == '"':
             return self.string()
-
-        # Single and multi-character tokens
         token_map = {
             '(': TokenType.LPAREN, ')': TokenType.RPAREN,
             '{': TokenType.LBRACE, '}': TokenType.RBRACE,
@@ -155,43 +142,37 @@ class Lexer:
             '+': TokenType.PLUS, '-': TokenType.MINUS,
             '*': TokenType.STAR, '%': TokenType.PERCENT,
         }
-
         if char in token_map:
             return Token(token_map[char], char, self.line, start_col)
-
         if char == '/':
             return Token(TokenType.SLASH, "/", self.line, start_col)
-
         if char == '=':
-            return Token(TokenType.EQUAL if self.match('=') else TokenType.ASSIGN,
-                        "==" if self.column > start_col + 1 else "=", self.line, start_col)
-        
+            if self.match('='):
+                return Token(TokenType.EQUAL, "==", self.line, start_col)
+            return Token(TokenType.ASSIGN, "=", self.line, start_col)
         if char == '!':
             if self.match('='):
                 return Token(TokenType.NOT_EQUAL, "!=", self.line, start_col)
             self.error("Unexpected character '!'")
             return Token(TokenType.ERROR, "!", self.line, start_col)
-
         if char == '<':
-            return Token(TokenType.LESS_EQUAL if self.match('=') else TokenType.LESS,
-                        "<=" if self.column > start_col + 1 else "<", self.line, start_col)
-
+            if self.match('='):
+                return Token(TokenType.LESS_EQUAL, "<=", self.line, start_col)
+            return Token(TokenType.LESS, "<", self.line, start_col)
         if char == '>':
-            return Token(TokenType.GREATER_EQUAL if self.match('=') else TokenType.GREATER,
-                        ">=" if self.column > start_col + 1 else ">", self.line, start_col)
-
+            if self.match('='):
+                return Token(TokenType.GREATER_EQUAL, ">=", self.line, start_col)
+            return Token(TokenType.GREATER, ">", self.line, start_col)
         if char == '&':
             if self.match('&'):
                 return Token(TokenType.AND, "&&", self.line, start_col)
             self.error("Unexpected character '&'")
             return Token(TokenType.ERROR, "&", self.line, start_col)
-
         if char == '|':
             if self.match('|'):
                 return Token(TokenType.OR, "||", self.line, start_col)
             self.error("Unexpected character '|'")
             return Token(TokenType.ERROR, "|", self.line, start_col)
-
         self.error(f"Unexpected character '{char}'")
         return Token(TokenType.ERROR, char, self.line, start_col)
 

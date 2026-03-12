@@ -1,16 +1,13 @@
 from enum import Enum, auto
 from dataclasses import dataclass
-from typing import Optional, Union, Any
+from typing import Optional, Union
 
 
 class TokenType(Enum):
-    # Literals
     IDENTIFIER = auto()
     INT_LITERAL = auto()
     FLOAT_LITERAL = auto()
     STRING_LITERAL = auto()
-    
-    # Keywords
     KEYWORD_IF = auto()
     KEYWORD_ELSE = auto()
     KEYWORD_WHILE = auto()
@@ -24,8 +21,6 @@ class TokenType(Enum):
     KEYWORD_VOID = auto()
     KEYWORD_STRUCT = auto()
     KEYWORD_FN = auto()
-    
-    # Operators
     PLUS = auto()
     MINUS = auto()
     STAR = auto()
@@ -40,16 +35,12 @@ class TokenType(Enum):
     GREATER_EQUAL = auto()
     AND = auto()
     OR = auto()
-    
-    # Delimiters
     LPAREN = auto()
     RPAREN = auto()
     LBRACE = auto()
     RBRACE = auto()
     SEMICOLON = auto()
     COMMA = auto()
-    
-    # Special
     END_OF_FILE = auto()
     ERROR = auto()
 
