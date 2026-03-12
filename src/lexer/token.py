@@ -78,6 +78,7 @@ class Token:
             TokenType.STAR: "STAR",
             TokenType.SLASH: "SLASH",
             TokenType.PERCENT: "PERCENT",
+            TokenType.BANG: "BANG",
             TokenType.ASSIGN: "ASSIGN",
             TokenType.EQUAL: "EQUAL",
             TokenType.NOT_EQUAL: "NOT_EQUAL",
