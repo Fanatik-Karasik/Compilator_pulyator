@@ -1,10 +1,11 @@
-# MiniCompiler (Compilator_pulyator)
-
 Учебный компилятор для упрощенного C-подобного языка.
 
 ## Требования
+=======
+##  Требования
 
-- Python 3.7 или выше
+
+- Python 3.13
 - Git
 
 ## Cтарт
@@ -15,6 +16,7 @@ git clone https://github.com/Fanatik-Karasik/Compilator_pulyator.git
 cd Compilator_pulyator
 
 ```
+
 
 # MiniCompiler (Compilator_pulyator)
 
@@ -38,3 +40,4 @@ dot -Tpng ast.dot -o ast.png
 
 Run All Tests
 python tests/test_runner.py
+```
