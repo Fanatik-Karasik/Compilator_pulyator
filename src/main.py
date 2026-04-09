@@ -1,9 +1,14 @@
+import sys
+import os
 import argparse
 
-from src.lexer import Lexer
-from src.parser import Parser
-from src.parser.ast import ASTVisitor
-from src.semantic.analyzer import SemanticAnalyzer
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
+from lexer import Lexer
+from parser import Parser
+from parser.ast import ASTVisitor
+from semantic.analyzer import SemanticAnalyzer
 
 
 class PrettyPrinter(ASTVisitor):
@@ -145,7 +150,7 @@ def main():
     args = parser_cli.parse_args()
     
     if not args.input:
-        print("Usage: python -m src.main <input_file> [--mode lex|parse|semantic]")
+        print("Usage: python src/main.py <input_file> [--mode lex|parse|semantic]")
         sys.exit(1)
     
     source = read_file(args.input)
@@ -176,7 +181,7 @@ def main():
             print(f"\nFound {len(analyzer.errors)} semantic error(s)")
             sys.exit(1)
         else:
-            print("✅ Semantic analysis passed successfully!")
+            print("Semantic analysis passed successfully!")
             print("\nSymbol Table:")
             for scope in analyzer.symbol_table.scopes:
                 for name, sym in scope.items():

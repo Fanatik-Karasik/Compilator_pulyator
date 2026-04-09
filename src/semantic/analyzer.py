@@ -1,7 +1,12 @@
-from src.parser.ast import *
-from src.semantic.symbol_table import SymbolTable, Symbol
-from src.semantic.type_system import *
-from src.semantic.errors import SemanticError
+import sys
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from symbol_table import SymbolTable, Symbol
+from type_system import *
+from errors import SemanticError
 
 
 class SemanticAnalyzer:
