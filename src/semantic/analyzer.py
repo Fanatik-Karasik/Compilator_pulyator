@@ -1,6 +1,8 @@
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, root_dir)
 
 from src.parser.ast import *
 from src.semantic.symbol_table import SymbolTable, Symbol
@@ -47,17 +49,17 @@ class SemanticAnalyzer:
             self.visit(decl)
 
     def visit_FunctionDecl(self, node):
-        return_type = self._parse_type(node.return_type)
-        symbol = Symbol(node.name, return_type, "func", (node.line, getattr(node, 'col', 0)))
+        return_type = self._parse_type(getattr(node, 'return_type', 'void'))
+        symbol = Symbol(node.name, return_type, "func", (getattr(node, 'line', 0), 0))
         try:
             self.symbol_table.insert(node.name, symbol)
         except ValueError:
-            self.report(f"duplicate function '{node.name}'", (node.line, getattr(node, 'col', 0)))
+            self.report(f"duplicate function '{node.name}'", (getattr(node, 'line', 0), 0))
 
         self.current_function_return_type = return_type
         self.symbol_table.enter_scope()
 
-        for param in node.parameters:
+        for param in getattr(node, 'parameters', []):
             p_type = self._parse_type(getattr(param, 'param_type', getattr(param, 'type', 'int')))
             p_sym = Symbol(param.name, p_type, "param", (getattr(param, 'line', 0), 0))
             try:
@@ -71,11 +73,11 @@ class SemanticAnalyzer:
 
     def visit_VarDecl(self, node):
         v_type = self._parse_type(getattr(node, 'var_type', getattr(node, 'type', 'int')))
-        symbol = Symbol(node.name, v_type, "var", (node.line, getattr(node, 'col', 0)))
+        symbol = Symbol(node.name, v_type, "var", (getattr(node, 'line', 0), 0))
         try:
             self.symbol_table.insert(node.name, symbol)
         except ValueError:
-            self.report(f"duplicate variable '{node.name}'", (node.line, 0))
+            self.report(f"duplicate variable '{node.name}'", (getattr(node, 'line', 0), 0))
 
         if hasattr(node, 'initializer') and node.initializer:
             self.visit(node.initializer)
@@ -83,7 +85,7 @@ class SemanticAnalyzer:
     def visit_IdentifierExpr(self, node):
         sym = self.symbol_table.lookup(node.name)
         if not sym:
-            self.report(f"undeclared identifier '{node.name}'", (node.line, 0))
+            self.report(f"undeclared identifier '{node.name}'", (getattr(node, 'line', 0), 0))
             node.type = IntType()
         else:
             node.symbol = sym

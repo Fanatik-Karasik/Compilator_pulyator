@@ -2,12 +2,15 @@ import sys
 import os
 import argparse
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from src.lexer import Lexer
 from src.parser import Parser
 from src.parser.ast import ASTVisitor
 from src.semantic.analyzer import SemanticAnalyzer
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, root)
+
 
 
 class PrettyPrinter(ASTVisitor):
