@@ -1,15 +1,15 @@
 import sys
 import os
-import argparse
 
-from src.lexer import Lexer
-from src.parser import Parser
-from src.parser.ast import ASTVisitor
-from src.semantic.analyzer import SemanticAnalyzer
-
-project_root = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
+import argparse
+
+from lexer import Lexer
+from parser import Parser
+from parser.ast import ASTVisitor
+from semantic.analyzer import SemanticAnalyzer
 
 
 class PrettyPrinter(ASTVisitor):
@@ -108,38 +108,6 @@ class PrettyPrinter(ASTVisitor):
         self.indent -= 2
         return result
     
-    def visit_for_stmt(self, node):
-        result = f"{self._indent()}For [line {node.line}]:\n"
-        self.indent += 1
-        if node.initializer:
-            result += f"{self._indent()}Init:\n"
-            self.indent += 1
-            result += node.initializer.accept(self)
-            self.indent -= 1
-        if node.condition:
-            result += f"{self._indent()}Condition:\n"
-            self.indent += 1
-            result += node.condition.accept(self)
-            self.indent -= 1
-        if node.update:
-            result += f"{self._indent()}Update:\n"
-            self.indent += 1
-            result += node.update.accept(self)
-            self.indent -= 1
-        result += f"{self._indent()}Body:\n"
-        self.indent += 1
-        result += node.body.accept(self)
-        self.indent -= 2
-        return result
-    
-    def visit_return_stmt(self, node):
-        result = f"{self._indent()}Return [line {node.line}]:\n"
-        if node.value:
-            self.indent += 1
-            result += node.value.accept(self)
-            self.indent -= 1
-        return result
-    
     def visit_var_decl_stmt(self, node):
         result = f"{self._indent()}VarDecl: {node.var_type} {node.name}"
         if node.initializer:
@@ -166,14 +134,6 @@ class PrettyPrinter(ASTVisitor):
             result += node.body.accept(self)
         self.indent -= 1
         return result
-    
-    def visit_struct_decl(self, node):
-        result = f"{self._indent()}StructDecl: {node.name} [line {node.line}]:\n"
-        self.indent += 1
-        for field in node.fields:
-            result += field.accept(self)
-        self.indent -= 1
-        return result
 
 
 def read_file(path: str) -> str:
@@ -184,16 +144,14 @@ def read_file(path: str) -> str:
 def main():
     parser_cli = argparse.ArgumentParser(description='MiniCompiler Pulyator (Sprint 3)')
     parser_cli.add_argument('input', nargs='?', help='Input source file')
-    parser_cli.add_argument('--mode', choices=['lex', 'parse', 'semantic'], default='parse',
-                            help='Operation mode: lex | parse | semantic')
-    parser_cli.add_argument('--ast-format', choices=['text', 'json', 'dot'], default='text',
-                            help='AST output format (only for parse mode)')
+    parser_cli.add_argument('--mode', choices=['lex', 'parse', 'semantic'], default='parse')
+    parser_cli.add_argument('--ast-format', choices=['text', 'json', 'dot'], default='text')
     parser_cli.add_argument('--output', '-o', help='Output file path')
-    parser_cli.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
+    parser_cli.add_argument('--verbose', '-v', action='store_true')
     args = parser_cli.parse_args()
     
     if not args.input:
-        print("Usage: python src/main.py <input_file> [--mode lex|parse|semantic] [--ast-format text|json|dot]")
+        print("Usage: python src/main.py <input_file> [--mode lex|parse|semantic]")
         sys.exit(1)
     
     source = read_file(args.input)
@@ -204,19 +162,14 @@ def main():
     if args.mode == 'lex':
         for token in tokens:
             print(token)
-        if args.verbose:
-            print(f"\nLexed {len(tokens)} tokens")
         sys.exit(0)
     
     parser = Parser(tokens)
     ast = parser.parse()
     
     if args.mode == 'parse':
-        if args.ast_format == 'text':
-            printer = PrettyPrinter()
-            print(ast.accept(printer))
-        else:
-            print(f"AST format '{args.ast_format}' not implemented yet.")
+        printer = PrettyPrinter()
+        print(ast.accept(printer))
         sys.exit(0)
     
     if args.mode == 'semantic':
@@ -233,10 +186,10 @@ def main():
             print("\nSymbol Table:")
             for scope in analyzer.symbol_table.scopes:
                 for name, sym in scope.items():
-                    print(f"  {name}: {sym.type} ({sym.kind}) depth={sym.scope_depth}")
+                    print(f"  {name}: {sym.type} ({sym.kind})")
         sys.exit(0)
     
-    print("Unknown mode. Use --mode lex|parse|semantic")
+    print("Unknown mode.")
     sys.exit(1)
 
 
