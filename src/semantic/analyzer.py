@@ -1,8 +1,8 @@
 import sys
 import os
 
-root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, root_dir)
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
 
 from src.parser.ast import *
 from src.semantic.symbol_table import SymbolTable, Symbol
