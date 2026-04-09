@@ -1,14 +1,7 @@
-import sys
-import os
-
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.insert(0, project_root)
-sys.path.insert(0, os.path.join(project_root, "src"))
-
-from parser.ast import *
-from semantic.symbol_table import SymbolTable, Symbol
-from semantic.type_system import *
-from semantic.errors import SemanticError
+from src.parser.ast import *
+from src.semantic.symbol_table import SymbolTable, Symbol
+from src.semantic.type_system import *
+from src.semantic.errors import SemanticError
 
 
 class SemanticAnalyzer:
