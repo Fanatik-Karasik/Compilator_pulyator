@@ -1,6 +1,5 @@
 import sys
 import os
-import json
 import argparse
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -8,6 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.lexer import Lexer
 from src.parser import Parser
 from src.parser.ast import ASTVisitor
+from src.semantic.analyzer import SemanticAnalyzer
 
 
 class PrettyPrinter(ASTVisitor):
@@ -180,105 +180,62 @@ def read_file(path: str) -> str:
 
 
 def main():
-    parser_cli = argparse.ArgumentParser(description='MiniCompiler Parser')
+    parser_cli = argparse.ArgumentParser(description='MiniCompiler Pulyator (Sprint 3)')
     parser_cli.add_argument('input', nargs='?', help='Input source file')
-    parser_cli.add_argument('--mode', choices=['lex', 'parse'], default='parse', help='Operation mode')
-    parser_cli.add_argument('--ast-format', choices=['text', 'json', 'dot'], default='text', help='AST output format')
+    parser_cli.add_argument('--mode', choices=['lex', 'parse', 'semantic'], default='parse',
+                            help='Operation mode: lex | parse | semantic')
+    parser_cli.add_argument('--ast-format', choices=['text', 'json', 'dot'], default='text',
+                            help='AST output format (only for parse mode)')
     parser_cli.add_argument('--output', '-o', help='Output file path')
     parser_cli.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
     args = parser_cli.parse_args()
     
     if not args.input:
-        print("Usage: python src/main.py <input_file> [--mode lex|parse] [--ast-format text|json|dot] [-o output] [-v]")
+        print("Usage: python src/main.py <input_file> [--mode lex|parse|semantic] [--ast-format text|json|dot]")
         sys.exit(1)
     
-    try:
-        source = read_file(args.input)
-        
-        if args.mode == 'lex':
-            lexer = Lexer(source)
-            tokens = lexer.scan_tokens()
-            output = '\n'.join(str(t) for t in tokens)
-        else:
-            lexer = Lexer(source)
-            tokens = lexer.scan_tokens()
-            
-            if lexer.errors:
-                print(f"Lexer errors: {len(lexer.errors)}", file=sys.stderr)
-                sys.exit(1)
-            
-            parser = Parser(tokens)
-            ast = parser.parse()
-            
-            if parser.errors:
-                print(f"Parser errors: {len(parser.errors)}", file=sys.stderr)
-                sys.exit(1)
-            
-            if args.ast_format == 'text':
-                printer = PrettyPrinter()
-                output = ast.accept(printer)
-            elif args.ast_format == 'json':
-                def node_to_dict(node):
-                    if isinstance(node, list):
-                        return [node_to_dict(n) for n in node]
-                    if not hasattr(node, '__dict__'):
-                        return node
-                    result = {'type': node.__class__.__name__}
-                    for k, v in node.__dict__.items():
-                        if k in ('line', 'column'):
-                            result[k] = v
-                        elif isinstance(v, (int, float, str, bool, type(None))):
-                            result[k] = v
-                        elif isinstance(v, list):
-                            result[k] = node_to_dict(v)
-                        elif hasattr(v, '__dict__'):
-                            result[k] = node_to_dict(v)
-                    return result
-                output = json.dumps(node_to_dict(ast), indent=2)
-            else:
-                output = f'digraph AST {{\n  node [shape=box];\n'
-                node_id = [0]
-                def emit_dot(node, parent_id=None):
-                    if not hasattr(node, '__dict__'):
-                        return
-                    my_id = node_id[0]
-                    node_id[0] += 1
-                    label = node.__class__.__name__
-                    if hasattr(node, 'name'):
-                        label += f":{node.name}"
-                    elif hasattr(node, 'value'):
-                        label += f":{node.value}"
-                    output_lines.append(f'  n{my_id} [label="{label}"];')
-                    if parent_id is not None:
-                        output_lines.append(f'  n{parent_id} -> n{my_id};')
-                    for k, v in node.__dict__.items():
-                        if k in ('line', 'column'):
-                            continue
-                        if isinstance(v, list):
-                            for item in v:
-                                emit_dot(item, my_id)
-                        elif hasattr(v, '__dict__'):
-                            emit_dot(v, my_id)
-                output_lines = []
-                emit_dot(ast)
-                output += '\n'.join(output_lines) + '\n}'
-        
-        if args.output:
-            with open(args.output, 'w', encoding='utf-8') as f:
-                f.write(output)
-            if args.verbose:
-                print(f"Output written to {args.output}")
-        else:
-            print(output)
-        
+    source = read_file(args.input)
+    
+    lexer = Lexer(source, args.input)
+    tokens = lexer.tokenize()
+    
+    if args.mode == 'lex':
+        for token in tokens:
+            print(token)
+        if args.verbose:
+            print(f"\nLexed {len(tokens)} tokens")
         sys.exit(0)
+    
+    parser = Parser(tokens)
+    ast = parser.parse()
+    
+    if args.mode == 'parse':
+        if args.ast_format == 'text':
+            printer = PrettyPrinter()
+            print(ast.accept(printer))
+        else:
+            print(f"AST format '{args.ast_format}' not implemented yet.")
+        sys.exit(0)
+    
+    if args.mode == 'semantic':
+        analyzer = SemanticAnalyzer()
+        analyzer.analyze(ast)
         
-    except FileNotFoundError:
-        print(f"Error: File '{args.input}' not found.", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+        if analyzer.errors:
+            for err in analyzer.errors:
+                print(err)
+            print(f"\nFound {len(analyzer.errors)} semantic error(s)")
+            sys.exit(1)
+        else:
+            print(" Semantic analysis passed successfully!")
+            print("\nSymbol Table:")
+            for scope in analyzer.symbol_table.scopes:
+                for name, sym in scope.items():
+                    print(f"  {name}: {sym.type} ({sym.kind}) depth={sym.scope_depth}")
+        sys.exit(0)
+    
+    print("Unknown mode. Use --mode lex|parse|semantic")
+    sys.exit(1)
 
 
 if __name__ == "__main__":

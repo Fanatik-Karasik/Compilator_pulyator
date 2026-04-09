@@ -24,7 +24,9 @@ class Parser:
         self.errors: List[str] = []
 
     def peek(self) -> Token:
-        return self.tokens[self.current] if not self.is_at_end() else self.tokens[-1]
+        if self.is_at_end():
+            return self.tokens[-1] if self.tokens else Token(TokenType.EOF, "", None, -1, -1)
+        return self.tokens[self.current]
 
     def previous(self) -> Token:
         return self.tokens[self.current - 1]
@@ -87,69 +89,87 @@ class Parser:
     def parse_declaration(self) -> Optional[DeclarationNode]:
         if self.match(TokenType.KEYWORD_FN):
             return self.parse_function_decl()
+
         if self.match(TokenType.KEYWORD_STRUCT):
             return self.parse_struct_decl()
-        if self.check(TokenType.KEYWORD_INT, TokenType.KEYWORD_FLOAT, 
-                     TokenType.KEYWORD_BOOL, TokenType.KEYWORD_VOID,
-                     TokenType.IDENTIFIER):
-            return self.parse_var_decl()
+
+        if self.check(TokenType.IDENTIFIER):
+            saved = self.current
+
+            self.advance()  
+            if self.check(TokenType.IDENTIFIER):
+                self.current = saved 
+                return self.parse_var_decl()
+            else:
+                self.current = saved  
+
+        self.error("Ожидается объявление (fn / struct / var).", self.peek())
         return None
 
     def parse_function_decl(self) -> FunctionDeclNode:
-        name_token = self.consume(TokenType.IDENTIFIER, "Expect function name.")
-        self.consume(TokenType.LPAREN, "Expect '(' after function name.")
+        name_token = self.consume(TokenType.IDENTIFIER, "Ожидается имя функции после 'fn'.")
+
+        self.consume(TokenType.LPAREN, "Ожидается '(' после имени функции.")
+
         parameters = []
         if not self.check(TokenType.RPAREN):
             while True:
                 param_type = self.parse_type()
-                param_name = self.consume(TokenType.IDENTIFIER, "Expect parameter name.")
-                parameters.append(ParamNode(param_name.line, param_name.column, param_type, param_name.lexeme))
+                param_name_token = self.consume(TokenType.IDENTIFIER, "Ожидается имя параметра.")
+                parameters.append(ParamNode(
+                    param_name_token.line,
+                    param_name_token.column,
+                    param_type,
+                    param_name_token.lexeme
+                ))
                 if not self.match(TokenType.COMMA):
                     break
-        self.consume(TokenType.RPAREN, "Expect ')' after parameters.")
+
+        self.consume(TokenType.RPAREN, "Ожидается ')' после параметров.")
+
         return_type = "void"
-        if self.match(TokenType.SLASH):
-            if not self.match(TokenType.GREATER):
-                raise ParseError("Expect '->' for return type.", self.previous())
-            return_type = self.parse_type()
+        if self.match(TokenType.MINUS):
+            self.consume(TokenType.GREATER, "Ожидается '->' после '-'.")
+            ret_token = self.consume(TokenType.IDENTIFIER, "Ожидается тип возвращаемого значения после '->'.")
+            return_type = ret_token.lexeme
+
+        self.consume(TokenType.LBRACE, "Ожидается '{' перед телом функции.")
         body = self.parse_block()
-        return FunctionDeclNode(name_token.line, name_token.column, return_type, name_token.lexeme, parameters, body)
 
-    def parse_struct_decl(self) -> StructDeclNode:
-        name_token = self.consume(TokenType.IDENTIFIER, "Expect struct name.")
-        self.consume(TokenType.LBRACE, "Expect '{' before struct fields.")
-        fields = []
-        while not self.check(TokenType.RBRACE) and not self.is_at_end():
-            field_decl = self.parse_var_decl()
-            if field_decl:
-                fields.append(field_decl)
-        self.consume(TokenType.RBRACE, "Expect '}' after struct fields.")
-        self.consume(TokenType.SEMICOLON, "Expect ';' after struct declaration.")
-        return StructDeclNode(name_token.line, name_token.column, name_token.lexeme, fields)
+        return FunctionDeclNode(
+            name_token.line,
+            name_token.column,
+            return_type,
+            name_token.lexeme,
+            parameters,
+            body
+        )
 
-    def parse_var_decl(self) -> Optional[VarDeclStmtNode]:
+    def parse_var_decl(self) -> VarDeclStmtNode:
         var_type = self.parse_type()
-        if not self.check(TokenType.IDENTIFIER):
-            self.current -= 1
-            return None
-        name_token = self.advance()
+        name_token = self.consume(TokenType.IDENTIFIER, "Ожидается имя переменной после типа.")
         initializer = None
         if self.match(TokenType.ASSIGN):
             initializer = self.parse_expression()
-        self.consume(TokenType.SEMICOLON, "Expect ';' after variable declaration.")
-        return VarDeclStmtNode(name_token.line, name_token.column, var_type, name_token.lexeme, initializer)
+        self.consume(TokenType.SEMICOLON, "Ожидается ';' после объявления переменной.")
+        return VarDeclStmtNode(
+            name_token.line,
+            name_token.column,
+            var_type,
+            name_token.lexeme,
+            initializer
+        )
 
     def parse_type(self) -> str:
-        if self.match(TokenType.KEYWORD_INT):
-            return "int"
-        if self.match(TokenType.KEYWORD_FLOAT):
-            return "float"
-        if self.match(TokenType.KEYWORD_BOOL):
-            return "bool"
-        if self.match(TokenType.KEYWORD_VOID):
-            return "void"
-        type_token = self.consume(TokenType.IDENTIFIER, "Expect type name.")
-        return type_token.lexeme
+        token = self.advance()
+        if token.type != TokenType.IDENTIFIER:
+            self.error(f"Ожидается имя типа, получено {token.type.name} '{token.lexeme}'", token)
+            return "unknown"
+
+        type_name = token.lexeme.lower()
+        if type_name in ("int", "float", "bool", "string", "void"):
+            return type_name
+        return token.lexeme
 
     def parse_statement(self) -> StatementNode:
         if self.match(TokenType.KEYWORD_IF):
@@ -168,14 +188,15 @@ class Parser:
         start_token = self.previous()
         statements = []
         while not self.check(TokenType.RBRACE) and not self.is_at_end():
-            statements.append(self.parse_statement())
-        self.consume(TokenType.RBRACE, "Expect '}' after block.")
+            stmt = self.parse_statement()
+            statements.append(stmt)
+        self.consume(TokenType.RBRACE, "Ожидается '}' после блока.")
         return BlockStmtNode(start_token.line, start_token.column, statements)
 
     def parse_if_stmt(self) -> IfStmtNode:
-        self.consume(TokenType.LPAREN, "Expect '(' after 'if'.")
+        self.consume(TokenType.LPAREN, "Ожидается '(' после 'if'.")
         condition = self.parse_expression()
-        self.consume(TokenType.RPAREN, "Expect ')' after condition.")
+        self.consume(TokenType.RPAREN, "Ожидается ')' после условия.")
         then_branch = self.parse_statement()
         else_branch = None
         if self.match(TokenType.KEYWORD_ELSE):
@@ -183,48 +204,59 @@ class Parser:
         return IfStmtNode(condition.line, condition.column, condition, then_branch, else_branch)
 
     def parse_while_stmt(self) -> WhileStmtNode:
-        self.consume(TokenType.LPAREN, "Expect '(' after 'while'.")
+        self.consume(TokenType.LPAREN, "Ожидается '(' после 'while'.")
         condition = self.parse_expression()
-        self.consume(TokenType.RPAREN, "Expect ')' after condition.")
+        self.consume(TokenType.RPAREN, "Ожидается ')' после условия.")
         body = self.parse_statement()
         return WhileStmtNode(condition.line, condition.column, condition, body)
 
     def parse_for_stmt(self) -> ForStmtNode:
-        self.consume(TokenType.LPAREN, "Expect '(' after 'for'.")
+        self.consume(TokenType.LPAREN, "Ожидается '(' после 'for'.")
+
         initializer = None
         if self.match(TokenType.SEMICOLON):
             pass
-        elif self.check(TokenType.KEYWORD_INT, TokenType.KEYWORD_FLOAT, 
-                       TokenType.KEYWORD_BOOL, TokenType.IDENTIFIER):
-            initializer = self.parse_var_decl()
         else:
-            initializer = self.parse_expr_stmt()
+            saved = self.current
+            try:
+                var_type = self.parse_type()
+                if self.check(TokenType.IDENTIFIER):
+                    initializer = self.parse_var_decl()
+                else:
+                    self.current = saved
+                    initializer = self.parse_expr_stmt()
+            except ParseError:
+                self.current = saved
+                initializer = self.parse_expr_stmt()
+
         condition = None
         if not self.check(TokenType.SEMICOLON):
             condition = self.parse_expression()
-        self.consume(TokenType.SEMICOLON, "Expect ';' after loop condition.")
+        self.consume(TokenType.SEMICOLON, "Ожидается ';' после условия цикла.")
+
         update = None
         if not self.check(TokenType.RPAREN):
             update = self.parse_expression()
-        self.consume(TokenType.RPAREN, "Expect ')' after for clauses.")
+        self.consume(TokenType.RPAREN, "Ожидается ')' после заголовка for.")
+
         body = self.parse_statement()
-        return ForStmtNode(
-            initializer.line if initializer else self.peek().line,
-            initializer.column if initializer else self.peek().column,
-            initializer, condition, update, body
-        )
+
+        line = initializer.line if initializer else self.peek().line
+        column = initializer.column if initializer else self.peek().column
+
+        return ForStmtNode(line, column, initializer, condition, update, body)
 
     def parse_return_stmt(self) -> ReturnStmtNode:
-        keyword = self.previous()
+        keyword = self.previous()  # return уже съеден match'ем
         value = None
         if not self.check(TokenType.SEMICOLON):
             value = self.parse_expression()
-        self.consume(TokenType.SEMICOLON, "Expect ';' after return value.")
+        self.consume(TokenType.SEMICOLON, "Ожидается ';' после return.")
         return ReturnStmtNode(keyword.line, keyword.column, value)
 
     def parse_expr_stmt(self) -> ExprStmtNode:
         expr = self.parse_expression()
-        self.consume(TokenType.SEMICOLON, "Expect ';' after expression.")
+        self.consume(TokenType.SEMICOLON, "Ожидается ';' после выражения.")
         return ExprStmtNode(expr.line, expr.column, expr)
 
     def parse_expression(self) -> ExpressionNode:
@@ -233,9 +265,9 @@ class Parser:
     def parse_assignment(self) -> ExpressionNode:
         expr = self.parse_logical_or()
         if self.match(TokenType.ASSIGN):
-            operator = self.previous()
+            equals = self.previous()
             value = self.parse_assignment()
-            return AssignmentExprNode(expr.line, expr.column, expr, operator, value)
+            return AssignmentExprNode(expr.line, expr.column, expr, equals, value)
         return expr
 
     def parse_logical_or(self) -> ExpressionNode:
@@ -264,8 +296,8 @@ class Parser:
 
     def parse_relational(self) -> ExpressionNode:
         expr = self.parse_additive()
-        while self.match(TokenType.LESS, TokenType.LESS_EQUAL, 
-                        TokenType.GREATER, TokenType.GREATER_EQUAL):
+        while self.match(TokenType.LESS, TokenType.LESS_EQUAL,
+                         TokenType.GREATER, TokenType.GREATER_EQUAL):
             operator = self.previous()
             right = self.parse_additive()
             expr = BinaryExprNode(expr.line, expr.column, expr, operator, right)
@@ -296,8 +328,11 @@ class Parser:
 
     def parse_call(self) -> ExpressionNode:
         expr = self.parse_primary()
-        while self.match(TokenType.LPAREN):
-            expr = self.finish_call(expr)
+        while True:
+            if self.match(TokenType.LPAREN):
+                expr = self.finish_call(expr)
+            else:
+                break
         return expr
 
     def finish_call(self, callee: ExpressionNode) -> CallExprNode:
@@ -307,24 +342,25 @@ class Parser:
                 arguments.append(self.parse_expression())
                 if not self.match(TokenType.COMMA):
                     break
-        paren = self.consume(TokenType.RPAREN, "Expect ')' after arguments.")
-        return CallExprNode(callee.line, callee.column, callee, arguments)
+        paren = self.consume(TokenType.RPAREN, "Ожидается ')' после аргументов.")
+        return CallExprNode(callee.line, callee.column, callee, arguments, paren)
 
     def parse_primary(self) -> ExpressionNode:
         if self.match(TokenType.KEYWORD_TRUE):
-            return LiteralExprNode(self.previous().line, self.previous().column, True, TokenType.KEYWORD_TRUE)
+            return LiteralExprNode(self.previous().line, self.previous().column, True, "true")
         if self.match(TokenType.KEYWORD_FALSE):
-            return LiteralExprNode(self.previous().line, self.previous().column, False, TokenType.KEYWORD_FALSE)
+            return LiteralExprNode(self.previous().line, self.previous().column, False, "false")
         if self.match(TokenType.INT_LITERAL):
-            return LiteralExprNode(self.previous().line, self.previous().column, self.previous().value, TokenType.INT_LITERAL)
+            return LiteralExprNode(self.previous().line, self.previous().column, self.previous().value, "int")
         if self.match(TokenType.FLOAT_LITERAL):
-            return LiteralExprNode(self.previous().line, self.previous().column, self.previous().value, TokenType.FLOAT_LITERAL)
+            return LiteralExprNode(self.previous().line, self.previous().column, self.previous().value, "float")
         if self.match(TokenType.STRING_LITERAL):
-            return LiteralExprNode(self.previous().line, self.previous().column, self.previous().value, TokenType.STRING_LITERAL)
+            return LiteralExprNode(self.previous().line, self.previous().column, self.previous().value, "string")
         if self.match(TokenType.IDENTIFIER):
             return IdentifierExprNode(self.previous().line, self.previous().column, self.previous().lexeme)
         if self.match(TokenType.LPAREN):
             expr = self.parse_expression()
-            self.consume(TokenType.RPAREN, "Expect ')' after expression.")
+            self.consume(TokenType.RPAREN, "Ожидается ')' после выражения в скобках.")
             return expr
-        raise ParseError("Expect expression.", self.peek())
+
+        raise ParseError("Ожидается выражение.", self.peek())
