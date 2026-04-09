@@ -32,6 +32,9 @@ python src/main.py examples/hello.src --mode lex
 Run Parser (AST output)
 python src/main.py examples/hello.src --mode parse --ast-format text
 
+Semantic Analysis
+python src/main.py examples/hello.src --mode semantic
+
 Generate DOT file for Graphviz
 python src/main.py examples/hello.src --mode parse --ast-format dot -o ast.dot
 dot -Tpng ast.dot -o ast.png
